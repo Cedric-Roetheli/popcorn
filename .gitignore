@@ -1,0 +1,7 @@
+.venv/
+analysis_outputs/
+analysis_outputs_v2/
+__pycache__/
+*.pyc
+*.log
+.DS_Store

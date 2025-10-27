@@ -1,0 +1,265 @@
+Stage 1
+
+You will read a movie’s plot summary (and subtitles if provided). Use only the provided text. 
+If something is not specified, write “not stated.” Answer in English.
+
+Produce exactly these fields:
+
+1) Setting (1–2 sentences): Describe where and when the story primarily takes place.
+2) Central conflict (1–2 sentences): Describe the main conflict, naming the protagonist(s) and who/what opposes them. State the conflict’s nature if clear.
+3) Evidence: Paste one short quote (≤25 words) or a subtitle line/timecode that supports your conflict description.
+4) Topic tag: Choose exactly one from:
+   - relationships_family
+   - crime_justice
+   - war_security
+   - politics_governance
+   - finance_business
+   - science_technology
+   - disaster_crisis
+   - supernatural_fantasy
+   - society_culture
+   - other
+   - not_stated
+5) Conflict_type tag: Choose exactly one from:
+   - violent_confrontation
+   - pursuit_escape
+   - survival
+   - investigation_quest
+   - crime_heist_competition
+   - institutional_legal_political
+   - romantic_interpersonal
+   - deception_intrigue
+   - other
+   - not_stated
+
+Output format (exactly this shape, no extra text):
+
+Setting: <1–2 sentences>
+Central conflict: <1–2 sentences>
+Evidence: "<quote or timecode>"
+Topic: <one label from the Topic list>
+Conflict_type: <one label from the Conflict_type list>
+
+----------
+
+Stage 2 — Characters (protagonist, antagonist, + up to 3 key others)
+General rules
+Use only the provided plot/subtitle text. If unspecified, write “not stated.”
+Pick additional characters only if they matter for the central conflict.
+Include one evidence quote or timecode (≤25 words) for each character.
+Categories
+Tier 1: human | instrument
+Tier 2 (choose exactly one):
+Human
+government_official
+security_military_police
+corporate
+criminal (personal/enrichment motives: theft, murder, etc.)
+terrorist (ideological/political violence, hijacks, attacks)
+scientist_engineer_expert
+journalist_media
+civilian_individual_or_community
+legal_judicial
+health_medical
+other_human
+Instrument
+technology_system
+financial_system_or_instrument
+regulation_law_policy
+environment_natural_disaster
+disease_pathogen
+supernatural_magic
+other_instrument
+Attributes (revised)
+All characters
+stance: supports | opposes | mixed/neutral
+evidence: short quote or subtitle timecode (≤25 words)
+Human only
+motive_primary: personal_gain | ideological | duty_service | profit | justice | survival | other | not_stated
+gender: male | female | other_undefined
+race: caucasian | person_of_color | other_undefined
+Instrument only
+purpose_in_plot: threat | constraint | tool | background | not_stated
+Sensitive-attribute guardrails (important)
+Do not infer gender or race from names, actors, or outside knowledge.
+Only assign gender if pronouns or descriptors appear in the provided text; else other_undefined.
+Only assign race if the provided text explicitly states a descriptor; else other_undefined.
+Always back choices with the evidence field.
+Prompt (drop-in)
+Read the provided plot summary and, if available, subtitles. Use only this text.
+If something is not specified, write “not stated.” Answer in English.
+
+Identify:
+- PROTAGONIST (1)
+- ANTAGONIST (1)
+- ADDITIONAL IMPORTANT CHARACTERS (up to 3) relevant to the central conflict.
+
+For each character, return:
+- name_or_label: <short name/label>
+- tier1: <human | instrument>
+- tier2: <pick ONE from the allowed lists>
+- stance: <supports | opposes | mixed/neutral>
+- evidence: "<≤25-word quote or subtitle timecode>"
+- motive_primary: <ONLY for human; personal_gain | ideological | duty_service | profit | justice | survival | other | not_stated>
+- gender: <ONLY for human; male | female | other_undefined>
+- race: <ONLY for human; caucasian | person_of_color | other_undefined>
+- purpose_in_plot: <ONLY for instrument; threat | constraint | tool | background | not_stated>
+
+Allowed tier2 values:
+
+HUMAN: government_official | security_military_police | corporate | criminal | terrorist | scientist_engineer_expert | journalist_media | civilian_individual_or_community | legal_judicial | health_medical | other_human
+
+INSTRUMENT: technology_system | financial_system_or_instrument | regulation_law_policy | environment_natural_disaster | disease_pathogen | supernatural_magic | other_instrument
+
+Output exactly in this structure (omit Additional_2/3 if unused):
+
+Protagonist:
+  name_or_label: ...
+  tier1: ...
+  tier2: ...
+  stance: ...
+  evidence: "..."
+  motive_primary: ...
+  gender: ...
+  race: ...
+  purpose_in_plot: not_stated
+
+Antagonist:
+  name_or_label: ...
+  tier1: ...
+  tier2: ...
+  stance: ...
+  evidence: "..."
+  motive_primary: ...
+  gender: ...
+  race: ...
+  purpose_in_plot: not_stated
+
+Additional_1:
+  name_or_label: ...
+  tier1: ...
+  tier2: ...
+  stance: ...
+  evidence: "..."
+  motive_primary: ...
+  gender: ...
+  race: ...
+  purpose_in_plot: ...
+
+Additional_2:
+  ...
+
+Additional_3:
+  ...
+Quick tie-breakers
+criminal vs terrorist: use terrorist only when an ideological/political motive is stated in the provided text; otherwise criminal. If unclear, set motive_primary=not_stated and choose based on how the act is framed.
+corporate vs regulation_law_policy vs financial_system_or_instrument: if an organization/people act, use human: corporate; if a rule constrains actions, use instrument: regulation_law_policy; if the market mechanism itself is the salient force, use instrument: financial_system_or_instrument.
+technology_system covers all tech and infrastructure, including nuclear, AI, and surveillance.
+
+----------
+
+Stage 3 — Role assignment (optional, framing-dependent)
+Goal: For each character extracted in Stage 2 (Protagonist, Antagonist, up to 3 Additional), assign at most one narrative role—only if the portrayal clearly fits—otherwise return none.
+Role set (pick one or none)
+	• hero — portrayed as trying to resolve the central conflict or protect others; the narrative signals approval or sympathy for their actions.
+	• villain — portrayed as creating/sustaining the central conflict or causing harm/obstruction; the narrative signals disapproval or blame.
+	• victim — portrayed as suffering harm or threat with limited agency relative to the central conflict.
+	• ambiguous — portrayal mixes cues (e.g., anti-hero), no clear endorsement or condemnation.
+	• none — not enough evidence in the provided text to assign a role relative to the central conflict.
+	Framing principle: Roles reflect portrayal and narrative viewpoint, not legal/moral labels.
+	Example: If Peter steals from Bob’s shop to feed Ashley, Peter can be framed as hero (altruistic, endorsed) or villain (harmful, condemned); Bob or Ashley may be victim depending on how the story frames harm and sympathy.
+How to decide (use only provided text)
+	1. Anchor to the central conflict from Stage 1.
+	2. Look for framing cues: evaluative language (brave/cruel), who gets sympathy/support, who inflicts/absorbs harm, who solves problems, resolution/outcomes.
+	3. If cues conflict or are weak, choose ambiguous or none rather than guessing.
+Guardrails
+	• Do not infer from outside knowledge or actor reputations.
+	• Do not use gender/race to influence the role decision.
+	• Provide an evidence quote (≤25 words) from the supplied text for every non-none assignment; for none, provide a brief reason (“insufficient evidence in text”).
+Prompt (drop-in)
+
+You are given the film’s plot summary (and subtitles if available) and the characters extracted in Stage 2.
+Use only the provided text. Roles are optional. Assign a role only if clearly supported.
+Allowed roles: hero | villain | victim | ambiguous | none
+For each listed character (Protagonist, Antagonist, Additional_1..3 if present), return:
+- role: <one of the allowed roles>
+- evidence: "<≤25-word quote or subtitle timecode that supports the role; if role=none, explain briefly: e.g., 'insufficient evidence in text'>"
+Output exactly in this format (omit Additional_* blocks that are not present):
+Protagonist_role: <hero|villain|victim|ambiguous|none>
+Protagonist_evidence: "<quote or brief 'insufficient evidence in text'>"
+Antagonist_role: <hero|villain|victim|ambiguous|none>
+Antagonist_evidence: "<quote or brief reason>"
+Additional_1_role: <...>
+Additional_1_evidence: "<...>"
+Additional_2_role: <...>
+Additional_2_evidence: "<...>"
+Additional_3_role: <...>
+Additional_3_evidence: "<...>"
+
+
+----------
+
+
+Stage 4 — Moral framing
+(Universalism vs. Particularism for characters and film; Deontological vs. Consequentialist for heroes only)
+Use only the supplied plot/subtitle text. If unclear, return none and explain briefly. Provide evidence quotes.
+Definitions (brief)
+	• Universalism: justifies actions with principles that apply to everyone (equal rules/rights).
+	• Particularism: justifies actions with exceptions based on group/relationship/status.
+	• Deontological: duty/rules/rights-based reasoning.
+	• Consequentialist: outcomes/trade-offs/“greater good” reasoning.
+Who to score
+	• Universalism–Particularism (UP): score each Stage-2 character (Protagonist, Antagonist, up to 3 Additional) and a film-overall summary.
+	• Deontological–Consequentialist (DC): score only characters whose Stage-3 role = hero. For others, return none.
+Output (strict shape, free scoring, with evidence)
+
+# Per character (repeat for Protagonist, Antagonist, Additional_1..3 if present)
+<CharacterLabel>_UP_label: <universalist | particularist | mixed/unclear | none>
+<CharacterLabel>_UP_rationale: <1–2 sentences, framing-dependent>
+<CharacterLabel>_UP_evidence: "<≤25-word quote>"
+# Heroes only
+<CharacterLabel>_DC_label: <deontological | consequentialist | mixed/unclear | none>
+<CharacterLabel>_DC_rationale: <1–2 sentences>
+<CharacterLabel>_DC_evidence: "<≤25-word quote>"
+# Film-level moral summary
+Film_UP_label: <universalist | particularist | mixed/unclear | none>
+Film_UP_rationale: <1–2 sentences>
+Film_UP_evidence: "<≤25-word quote>"
+Notes
+	• Roles are framing-dependent: decide labels by how the narrative portrays characters (approval/blame/sympathy), not by legalities.
+	• If you cannot find an explicit justification/reasoning line, use none and say “insufficient evidence in text.”
+Drop-in prompt (Stage 4)
+
+You are given the film’s plot summary/subtitles, the Stage-2 character list, and Stage-3 roles.
+Use only this text. Labels are optional; assign them only if clearly supported.
+For each listed character:
+- Assign UP_label with a 1–2 sentence rationale and one ≤25-word evidence quote.
+- If this character’s Stage-3 role = hero, also assign DC_label with rationale and one ≤25-word evidence quote.
+- If unclear, use 'none' and explain briefly.
+Finally, provide a Film_UP_label with a 1–2 sentence rationale and one ≤25-word evidence quote that captures the film’s dominant moral framing.
+Return exactly in the specified keys.
+
+Stage 5 — In-group / Out-group dynamics (film level)
+Goal: capture whether the story favors/protects an in-group and/or blames an out-group.
+Return up to two salient groups treated as collective actors.
+Fields (repeat for each group)
+	• group_label: short text
+	• group_type: {nation, local_community, family, profession, company, government_branch, movement, other}
+	• relation_to_protagonist: {in_group, out_group, unclear}
+	• portrayal: {positive, negative, mixed, neutral}
+	• is_threatened: {yes, no, unclear}
+	• evidence: "≤25-word quote"
+Film-level flags
+	• parochialism_flag: {1, 0, none}  (1 if the protagonist’s in_group is favored at others’ expense; none if unclear)
+	• outgroup_blame_flag: {1, 0, none} (1 if an out_group is explicitly blamed for harm; none if unclear)
+Drop-in prompt (Stage 5)
+
+Use only the provided plot/subtitle text.
+List up to two salient social groups treated as collective actors, filling:
+group_label, group_type, relation_to_protagonist, portrayal, is_threatened, evidence (≤25 words).
+Then set:
+parochialism_flag = 1 if the protagonist’s in_group is favored at others’ expense, else 0, or "none" if unclear.
+outgroup_blame_flag = 1 if an out_group is explicitly blamed, else 0, or "none" if unclear.
+Return exactly these fields; if no salient groups, return none for both flags and omit group entries.
+
+
