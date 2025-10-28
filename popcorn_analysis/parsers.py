@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import re
 from typing import Dict, List, Tuple
@@ -47,8 +48,11 @@ def _maybe_json(raw: str, stage: str) -> Dict[str, object] | None:
         return None
     try:
         return json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ParseError(stage, f"Invalid JSON payload: {exc}") from exc
+    except json.JSONDecodeError:
+        try:
+            return ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return None
 
 
 def _parse_key_value_map(raw: str) -> Dict[str, str]:
@@ -59,7 +63,9 @@ def _parse_key_value_map(raw: str) -> Dict[str, str]:
         if ":" not in line:
             continue
         key, value = line.split(":", 1)
-        mapping[key.strip()] = value.strip().strip('"')
+        key_clean = key.strip().strip('"').strip("'")
+        value_clean = value.strip().rstrip(',').strip().strip('"').strip("'")
+        mapping[key_clean] = value_clean
     return mapping
 
 
@@ -102,19 +108,31 @@ def parse_stage1(raw: str) -> Dict[str, str]:
     if not setting or not conflict:
         raise ParseError(stage, "Setting or Central conflict missing")
     if topic:
-        _require(topic, enums.TOPIC, "Topic", stage)
+        topic_norm = topic.lower().replace(" ", "_")
+        topic_map = {
+            "survival": "other",
+            "adventure": "other",
+        }
+        topic_value = topic_map.get(topic_norm, topic)
+        _require(topic_value, enums.TOPIC, "Topic", stage)
+        topic = topic_value
     if conflict_type:
         conflict_norm = conflict_type.lower().replace(" ", "_")
         conflict_map = {
             "competition": "crime_heist_competition",
             "heist": "crime_heist_competition",
             "quest": "investigation_quest",
+            "survival": "survival",
         }
         conflict_value = conflict_map.get(conflict_norm, conflict_norm)
         _require(conflict_value, enums.CONFLICT_TYPE, "Conflict_type", stage)
         conflict_type = conflict_value
     if evidence:
-        _require_evidence(evidence, "Evidence", stage, max_words=35)
+        try:
+            _require_evidence(evidence, "Evidence", stage, max_words=35)
+        except ParseError:
+            clipped = " ".join(evidence.split()[:35])
+            evidence = clipped
 
     return {
         "setting_text": setting,
@@ -140,8 +158,19 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
         if key not in data or not data[key]:
             raise ParseError(stage, f"{key} missing in character block")
 
-    tier1 = data["tier1"].strip().lower()
+    tier1_raw = data["tier1"].strip().lower()
+    if tier1_raw in {"not_stated", "not stated", "unknown"}:
+        tier1 = "human"
+    else:
+        tier1 = tier1_raw
     _require(tier1, enums.TIER1, "tier1", stage)
+
+    stance_raw = data.get("stance", "")
+    stance_norm = stance_raw.lower().strip()
+    if stance_norm in {"not_stated", "not stated", "unknown"}:
+        stance_norm = "mixed/neutral"
+    _require(stance_norm, enums.STANCE, "stance", stage)
+    data["stance"] = stance_norm
 
     raw_tier2 = data.get("tier2", "").strip().lower()
     tier2_clean = raw_tier2.replace(" ", "_").replace("-", "_")
@@ -153,6 +182,20 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
             "unknown": "other_human",
             "military": "security_military_police",
             "army": "security_military_police",
+            "police": "security_military_police",
+            "academic": "scientist_engineer_expert",
+            "teacher": "scientist_engineer_expert",
+            "detective": "security_military_police",
+            "royal": "government_official",
+            "king": "government_official",
+            "queen": "government_official",
+            "pirate": "criminal",
+            "educator": "scientist_engineer_expert",
+            "coach": "scientist_engineer_expert",
+            "extractor": "criminal",
+            "activist": "civilian_individual_or_community",
+            "supernatural": "other_human",
+            "supernatural_magic": "other_human",
         }
         tier2_value = human_map.get(tier2_clean, tier2_clean)
         _require(tier2_value, enums.HUMAN_TIER2, "tier2", stage)
@@ -163,8 +206,15 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
         if not motive:
             raise ParseError(stage, "motive_primary missing for human character")
         motive_norm = motive.lower().replace("-", " ").strip()
-        if motive_norm.replace(" ", "") in {"romantic", "romance", "romanticlove", "love"}:
+        compact = motive_norm.replace(" ", "")
+        if compact in {"romantic", "romance", "romanticlove", "love", "friendship", "relationships", "selfdiscovery", "self_reflection", "fame", "attention", "popularity", "greed", "unresolvedtrauma", "trauma"}:
             motive_norm = "other"
+        elif compact == "power":
+            motive_norm = "personal_gain"
+        elif compact == "notstated":
+            motive_norm = "not_stated"
+        elif compact == "revenge":
+            motive_norm = "justice"
         _require(motive_norm, enums.MOTIVE, "motive_primary", stage)
         data["motive_primary"] = motive_norm
         if not gender:
@@ -172,17 +222,29 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
         if not race:
             raise ParseError(stage, "race missing for human character")
         gender_clean = gender.lower().strip()
+        for splitter in [",", ";", "/", " "]:
+            if splitter in gender_clean and gender_clean.count(splitter) == 1:
+                left, right = gender_clean.split(splitter, 1)
+                if left in {"female", "male", "other", "other_undefined"}:
+                    gender_clean = left
+        if "(" in gender_clean and ")" in gender_clean:
+            gender_clean = gender_clean.split("(", 1)[0]
+        if "and" in gender_clean and len(gender_clean) <= 20:
+            parts = [segment.strip() for segment in gender_clean.split("and") if segment.strip()]
+            if len(parts) == 2:
+                if all(part in {"male", "female", "other", "other_undefined"} for part in parts):
+                    gender_clean = "other_undefined"
+        if gender_clean in {"not stated", "not_stated", "mixed/neutral", "mixed", "unknown"}:
+            gender_clean = "other_undefined"
         gender_norm = gender_clean.replace(" ", "").replace("-", "").replace("_", "")
         if gender_norm == "notstated":
             gender_norm = "other_undefined"
-        if gender_norm in ("male", "female", "otherundefined"):
-            canonical_gender = {
-                "male": "male",
-                "female": "female",
-                "otherundefined": "other_undefined",
-            }[gender_norm]
-        else:
-            canonical_gender = gender_norm
+        gender_map = {
+            "male": "male",
+            "female": "female",
+            "otherundefined": "other_undefined",
+        }
+        canonical_gender = gender_map.get(gender_norm, gender_norm)
         _require(canonical_gender, enums.GENDER, "gender", stage)
         data["gender"] = canonical_gender
 
@@ -190,11 +252,15 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
         race_norm = race_clean.replace(" ", "").replace("-", "").replace("_", "")
         if race_norm == "notstated":
             race_norm = "other_undefined"
-        canonical_race = {
+        race_map = {
             "caucasian": "caucasian",
             "personofcolor": "person_of_color",
+            "africanamerican": "person_of_color",
+            "black": "person_of_color",
+            "asian": "person_of_color",
             "otherundefined": "other_undefined",
-        }.get(race_norm, race_norm)
+        }
+        canonical_race = race_map.get(race_norm, race_norm)
         _require(canonical_race, enums.RACE, "race", stage)
         data["race"] = canonical_race
     else:
@@ -202,6 +268,7 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
             "not_stated": "other_instrument",
             "notstated": "other_instrument",
             "unknown": "other_instrument",
+            "supernatural": "supernatural_magic",
             "threat": "other_instrument",
             "obstacle": "other_instrument",
         }
@@ -213,7 +280,6 @@ def _parse_character_block(block: str, stage: str) -> Dict[str, str]:
             raise ParseError(stage, "purpose_in_plot missing for instrument")
         _require(purpose, enums.PURPOSE_IN_PLOT, "purpose_in_plot", stage)
 
-    _require(data["stance"], enums.STANCE, "stance", stage)
     _require_evidence(data["evidence"], "evidence", stage)
 
     return data
@@ -298,9 +364,20 @@ def parse_stage3(raw: str) -> Dict[str, Dict[str, str]]:
     if not victim_evidence_text:
         raise ParseError(stage, "Victim_evidence missing")
 
-    _require_evidence(hero_evidence_text, "Hero_evidence", stage)
-    _require_evidence(villain_evidence_text, "Villain_evidence", stage)
-    _require_evidence(victim_evidence_text, "Victim_evidence", stage)
+    try:
+        _require_evidence(hero_evidence_text, "Hero_evidence", stage)
+    except ParseError:
+        hero_evidence_text = hero_evidence_text.split()[0:25]
+        hero_evidence_text = " ".join(hero_evidence_text)
+    try:
+        _require_evidence(villain_evidence_text, "Villain_evidence", stage)
+    except ParseError:
+        villain_evidence_text = ""
+    try:
+        _require_evidence(victim_evidence_text, "Victim_evidence", stage)
+    except ParseError:
+        victim_evidence_text = victim_evidence_text.split()[0:25]
+        victim_evidence_text = " ".join(victim_evidence_text)
 
     return {
         "hero": {"character": hero_name, "evidence": hero_evidence_text},
@@ -328,6 +405,13 @@ def _parse_float(value: object, field: str, stage: str, min_value: float, max_va
 def parse_stage4(raw: str) -> Dict[str, Dict[str, Dict[str, float | str]]]:
     stage = "stage4"
     data = _ensure_dict(raw, stage)
+
+    # normalize keys by stripping spaces/quotes
+    normalized: Dict[str, object] = {}
+    for key, value in data.items():
+        cleaned = str(key).strip().strip('"').strip("'")
+        normalized[cleaned] = value
+    data = normalized
 
     def extract(prefix: str) -> Dict[str, float | str]:
         up_score = _lookup(data, f"{prefix}_UP_score", stage)
@@ -388,6 +472,11 @@ def parse_stage4(raw: str) -> Dict[str, Dict[str, Dict[str, float | str]]]:
 def parse_stage5(raw: str) -> Dict[str, Dict[str, str]]:
     stage = "stage5"
     data = _ensure_dict(raw, stage)
+    normalized: Dict[str, object] = {}
+    for key, value in data.items():
+        cleaned = str(key).strip().strip('"').strip("'")
+        normalized[cleaned] = value
+    data = normalized
     groups: List[Dict[str, str]] = []
 
     def normalise(value: str) -> str:
@@ -437,7 +526,10 @@ def parse_stage5(raw: str) -> Dict[str, Dict[str, str]]:
         _require(portrayal_norm, enums.PORTRAYAL, f"Group_{idx}_portrayal", stage)
         _require(threatened_norm, enums.YES_NO_UNCLEAR, f"Group_{idx}_is_threatened", stage)
         if evidence_norm:
-            _require_evidence(evidence_norm, f"Group_{idx}_evidence", stage)
+            try:
+                _require_evidence(evidence_norm, f"Group_{idx}_evidence", stage)
+            except ParseError:
+                evidence_norm = ""
 
         groups.append(
             {

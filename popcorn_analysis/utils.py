@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ast
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -13,8 +14,21 @@ def short_hash(text: str) -> str:
 
 
 def load_json(path: Path) -> Dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    text = path.read_text(encoding="utf-8")
+    try:
+        decoder = json.JSONDecoder()
+        obj, _ = decoder.raw_decode(text)
+        if not isinstance(obj, dict):
+            raise ValueError("not a JSON object")
+        return obj
+    except (ValueError, json.JSONDecodeError):
+        try:
+            parsed = ast.literal_eval(text)
+        except (ValueError, SyntaxError) as exc:
+            raise RuntimeError(f"Failed to parse JSON for {path}: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise RuntimeError(f"Unexpected structure for {path}: {type(parsed)}")
+        return parsed
 
 
 def save_json(path: Path, payload: Dict[str, Any]) -> None:

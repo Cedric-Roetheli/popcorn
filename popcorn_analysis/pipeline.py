@@ -77,7 +77,13 @@ class AnalysisPipeline:
         path = self._stage_path(stage, film_id)
         if not path.exists():
             return None
-        return load_json(path)
+        try:
+            return load_json(path)
+        except RuntimeError:
+            raw_text = path.read_text(encoding="utf-8")
+            parsed = self._parse_stage(stage, raw_text)
+            save_json(path, parsed)
+            return parsed
 
     def _save_stage(self, stage: str, film_id: str, payload: Dict) -> None:
         path = self._stage_path(stage, film_id)
