@@ -67,11 +67,11 @@ Options:
 
 The analysis uses staged prompts to extract increasingly detailed information. The stages run sequentially per film and cache raw model responses in `analysis_outputs/` (or any directory you choose). The default stages:
 
-1. **Stage 1** – setting + central conflict + topic tags.
-2. **Stage 2** – protagonist/antagonist plus up to three additional characters with attributes (tier, stance, evidence, demographic fields).
-3. **Stage 3** – assigns existing characters to the roles hero, villain, victim (victim list may include multiple names).
-4. **Stage 4** – numeric moral framing (universalism ↔ particularism, deontological ↔ consequentialist) for protagonist, antagonist, and the film overall, along with confidence and supporting notes.
-5. **Stage 5** – identifies up to two social groups, their relation to the protagonist, portrayal, threat status, and flags for parochialism/out-group blame.
+ **Stage 1** – setting + central conflict + topic tags.
+ **Stage 2** – protagonist/antagonist plus up to three additional characters with attributes (tier, stance, evidence, demographic fields).
+ **Stage 3** – assigns existing characters to the roles hero, villain, victim (victim list may include multiple names).
+ **Stage 4** – numeric moral framing (universalism ↔ particularism, deontological ↔ consequentialist) for protagonist, antagonist, and the film overall, along with confidence and supporting notes.
+ **Stage 5** – identifies up to two social groups, their relation to the protagonist, portrayal, threat status, and flags for parochialism/out-group blame.
 
 ### Running the pipeline
 
